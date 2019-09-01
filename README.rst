@@ -75,4 +75,5 @@ Search for 'Adding/Removing Rows, Columns and Edges'.
 
 Notes
 =====
-Hook splice into app.py.
+Hooked Splice into app. Need to wire app so it uses detail from splice to determine
+to adjust the image.
