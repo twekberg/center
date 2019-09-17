@@ -58,7 +58,6 @@ class Splice():
     def action(self, sides, left_size, top_size):
         splice_arg = None
         side_code = ''.join([side[0].upper() for side in ['left', 'top', 'right', 'bottom'] if side in sides])
-        print("side_code='%s'" % (side_code,))
         if side_code == 'L':
             splice_arg = '%sx0' % left_size
         elif side_code == 'T':
