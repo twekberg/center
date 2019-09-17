@@ -77,3 +77,4 @@ Notes
 =====
 Hooked Splice into app. Need to wire app so it uses detail from splice to determine
 to adjust the image.
+Wired it up to splice, but haven't tested it yet.
