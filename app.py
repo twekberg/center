@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Display a png file and report the mouse position on a mouse click.
+Display an image file and report the mouse position on a mouse click.
 """
 
 import os
@@ -9,9 +9,10 @@ import os.path
 import argparse
 import sys
 import subprocess
+import time
 import tkinter as tk
 
-from png import Png
+from get_image_info import get_image_size
 from splice import Splice
 
 def build_parser():
@@ -31,16 +32,16 @@ def build_parser():
 
 
 class Application():
-    def __init__(self, root, canvas, in_image_filename, out_image_filename, img):
+    def __init__(self, root, canvas, source_image_filename, in_image_filename, out_image_filename, img, scale_factor):
         self.root = root
+        self.canvas = canvas
+        self.source_image_filename = source_image_filename
         self.in_image_filename = in_image_filename
         self.out_image_filename = out_image_filename
+        self.scale_factor = scale_factor
         
-        png = Png(in_image_filename)
-        image_info = png.get_header()
-        self.image_width  = image_info['width']
-        self.image_height = image_info['height']
-        png.close()
+        (self.image_width, self.image_height) = get_image_size(in_image_filename)
+        (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
 
         canvas.create_image(0, 0, anchor=tk.NW, image=img)
         canvas.bind("<Button-1>", self.callback)
@@ -48,21 +49,24 @@ class Application():
 
 
     def callback(self, event):  
-        self.x = event.x
-        self.y = event.y
+        # Need to /100 because the scale_factor is a percentage.
+        self.x = int(event.x / (int(self.scale_factor)/100))
+        self.y = int(event.y / (int(self.scale_factor)/100))
+        print('TWE In callback', self.scale_factor, (self.x, self.y),(event.x, event.y))
         if self.x >= 0 and self.y >= 0:
+            self.canvas.unbind("<Button-1>")
             self.root.destroy()
 
 
     def process_image(self):
-        (pad_left, pad_top, pad_right, pad_bottom) = compute_padding(self.x, self.y, self.image_width, self.image_height)
+        (pad_left, pad_top, pad_right, pad_bottom) = compute_padding(self.x, self.y, self.source_image_width, self.source_image_height)
         left_side = pad_left or pad_right
         top_side = pad_top or pad_bottom
         sides = []
         for (pad, side) in [(pad_left, 'left'), (pad_top, 'top'), (pad_right, 'right'), (pad_bottom, 'bottom')]:
             if pad:
                 sides.append(side)
-        s = Splice(self.in_image_filename, self.out_image_filename)
+        s = Splice(self.source_image_filename, self.out_image_filename)
         s.action(sides, left_side, top_side)
         
 
@@ -71,6 +75,7 @@ def compute_padding(x, y, width, height):
     """
     Determine the padding needed to center the image at (x,y).
     """
+    print('TWE compute_padding:', (x, y, width, height))
     if x < width / 2:
         pad_right = 0
         pad_left = width - 2 * x
@@ -88,34 +93,47 @@ def compute_padding(x, y, width, height):
 
 def main(args):
     out_filenames = os.listdir(args.out_dir)
-    for in_filename in os.listdir(args.in_dir):
+    in_filenames  = os.listdir(args.in_dir)
+    n_file = 0
+    for in_filename in in_filenames:
+        n_file += 1
         if in_filename in out_filenames:
-            break
-        filename_png = os.path.join(args.tmp_dir, in_filename[0:-3] + 'png')
-        print('TWE', filename_png)
-        ret = subprocess.call(['magick', 'convert',
-                               os.path.join(args.in_dir, in_filename),
-                               filename_png])
-        if ret != 0:
-            print('Got a subprocess.call error', ret)
-            exit(ret)
-        png = Png(filename_png)
-        image_info = png.get_header()
-        image_width  = image_info['width']
-        image_height = image_info['height']
+            continue
+        in_filename_path = os.path.join(args.in_dir, in_filename)
+        root = tk.Tk()
+        png_filename_path = os.path.join(args.tmp_dir, in_filename[0:-3] + 'png')
+        (image_width, image_height) = get_image_size(in_filename_path)
+        print('TWE', in_filename, 'image size=', (image_width, image_height))
 
-        root = tk.Tk()      
+        # Scale the source image to make it fit within the screen. Small images get enlarged.
+        # Reduce screen height for window title and space used at the bottom of the screen.
+        screen_height = root.winfo_screenheight() - 100
+        # There is plenty of screen width. Base scale factor on the smaller height.
+        # > 1 -> enlarge, < 1 -> shrink.
+        scale_factor = '%1.0f' % (screen_height / image_height * 100,)
+        print('TWE scale_factor=', scale_factor)
+
+        cmd = ['magick', 'convert', in_filename_path,
+               '-resize', scale_factor+'%',
+               png_filename_path]
+        ret = subprocess.call(cmd)
+        if ret != 0:
+            raise Exception('Got a subprocess.call error %s, command=%s' % (ret,' '.join(cmd)))
+        (image_width, image_height) = get_image_size(png_filename_path)
+
         canvas = tk.Canvas(root, width =image_width, height = image_height)
         canvas.pack()      
         # Putting the next line into __init__ causes the image to not appear.
 
-        out_filename = os.path.join(args.out_dir, in_filename)
-        img = tk.PhotoImage(file=filename_png)
-        application = Application(root, canvas, filename_png, out_filename, img)
-        #application = Application(root, canvas, filename_png, tk.PhotoImage(file=filename_png))
+        out_filename_path = os.path.join(args.out_dir, in_filename)
+        img = tk.PhotoImage(file=png_filename_path)
+        application = Application(root, canvas, os.path.join(args.in_dir, in_filename),
+                                  png_filename_path, out_filename_path, img, scale_factor)
+        #application = Application(root, canvas, png_filename_path, tk.PhotoImage(file=png_filename_path))
         tk.mainloop()
         application.process_image()
-        os.remove(filename_png)
+        os.remove(png_filename_path)
+        time.sleep(1)
 
 
 if __name__ == '__main__':

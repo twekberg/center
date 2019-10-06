@@ -16,11 +16,13 @@ for left in 'left' 'right' ''; do
 done
 """
 
-from png import Png
 import argparse
 from datetime import datetime
 import subprocess
 import tkinter as tk
+
+from get_image_info import get_image_size
+
 
 in_image_filename = 'ball.png'
 out_image_filename = 'ball-splice-left.png'
@@ -46,16 +48,14 @@ class Splice():
     def __init__(self, in_image_filename, out_image_filename):
         self.in_image_filename = in_image_filename
         self.out_image_filename = out_image_filename
-        png = Png(self.in_image_filename)
-        image_info = png.get_header()
-        self.image_width  = image_info['width']
-        self.image_height = image_info['height']
-        png.close()
+        (self.image_width, self.image_height) = get_image_size(self.in_image_filename)
+        print('TWE splice size=', (self.image_width, self.image_height))
 
     def get_wh(self):
         return (self.image_width, self.image_height)
 
     def action(self, sides, left_size, top_size):
+        print('TWE splice sides=', sides, 'sizes=', (left_size, top_size))
         splice_arg = None
         side_code = ''.join([side[0].upper() for side in ['left', 'top', 'right', 'bottom'] if side in sides])
         if side_code == 'L':
@@ -75,13 +75,14 @@ class Splice():
         elif side_code == 'RB':
             splice_arg = '%sx%s+%s+%s' % (left_size, top_size, self.image_width, self.image_height)
         if splice_arg:
-            ret = subprocess.call(['magick', 'convert', self.in_image_filename,
-                                   '-background', 'black',
-                                   '-splice', splice_arg,
-                                   self.out_image_filename])
+            cmd = ['magick', 'convert', self.in_image_filename,
+                   '-background', 'black',
+                   '-splice', splice_arg,
+                   self.out_image_filename]
+            print('TWE', 'splice, cmd=%s' % ' '.join(cmd))
+            ret = subprocess.call(cmd)
             if ret != 0:
-                print('Got a subprocess.call error', ret)
-                exit(ret)
+                raise Exception('Got a subprocess.call error %s, command=%s' % (ret,' '.join(cmd)))
         else:
             print('Unknown side')
 
