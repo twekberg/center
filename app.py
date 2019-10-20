@@ -2,6 +2,10 @@
 
 """
 Display an image file and report the mouse position on a mouse click.
+
+acen
+cd ~/STUFF/N/O/SPELLSNO/IMAGES/BIG  
+~/src/center/app.py -i 00SPREAD -o 00SPREAD-CENTER -t TMP
 """
 
 import os
@@ -50,8 +54,8 @@ class Application():
 
     def callback(self, event):  
         # Need to /100 because the scale_factor is a percentage.
-        self.x = int(event.x / (int(self.scale_factor)/100))
-        self.y = int(event.y / (int(self.scale_factor)/100))
+        self.x = round(event.x / (int(self.scale_factor)/100))
+        self.y = round(event.y / (int(self.scale_factor)/100))
         print('TWE In callback', self.scale_factor, (self.x, self.y),(event.x, event.y))
         if self.x >= 0 and self.y >= 0:
             self.canvas.unbind("<Button-1>")
@@ -75,7 +79,6 @@ def compute_padding(x, y, width, height):
     """
     Determine the padding needed to center the image at (x,y).
     """
-    print('TWE compute_padding:', (x, y, width, height))
     if x < width / 2:
         pad_right = 0
         pad_left = width - 2 * x
@@ -91,6 +94,16 @@ def compute_padding(x, y, width, height):
     return (pad_left, pad_top, pad_right, pad_bottom)
 
 
+def add_to_clipboard(text):
+    """
+    Put the text in the clipboard, removing whitespace from either end. What actually
+    happens is that an extra character is appended to the clipboard which needs to be
+    deleted to get the text.
+    """
+    command = 'echo "' + text.strip() + '"| /cygdrive/c/Windows/System32/clip.exe'
+    os.system(command)
+
+
 def main(args):
     out_filenames = os.listdir(args.out_dir)
     in_filenames  = os.listdir(args.in_dir)
@@ -100,10 +113,11 @@ def main(args):
         if in_filename in out_filenames:
             continue
         in_filename_path = os.path.join(args.in_dir, in_filename)
+        # Put in clipboard in case a transform is needed or the image got an error.
+        add_to_clipboard(in_filename)
         root = tk.Tk()
         png_filename_path = os.path.join(args.tmp_dir, in_filename[0:-3] + 'png')
         (image_width, image_height) = get_image_size(in_filename_path)
-        print('TWE', in_filename, 'image size=', (image_width, image_height))
 
         # Scale the source image to make it fit within the screen. Small images get enlarged.
         # Reduce screen height for window title and space used at the bottom of the screen.
@@ -111,8 +125,12 @@ def main(args):
         # There is plenty of screen width. Base scale factor on the smaller height.
         # > 1 -> enlarge, < 1 -> shrink.
         scale_factor = '%1.0f' % (screen_height / image_height * 100,)
-        print('TWE scale_factor=', scale_factor)
 
+        print('%d/%d %s ih=%s, %s%%' % (n_file, len(in_filenames), in_filename, image_height, scale_factor))
+        if image_height <= 1:
+            print('-------------------------------------------------------------------------------')
+            print('Bad image height. Use GIMP to re-export this image as a GIF.')
+            continue
         cmd = ['magick', 'convert', in_filename_path,
                '-resize', scale_factor+'%',
                png_filename_path]
@@ -126,7 +144,7 @@ def main(args):
         # Putting the next line into __init__ causes the image to not appear.
 
         out_filename_path = os.path.join(args.out_dir, in_filename)
-        img = tk.PhotoImage(file=png_filename_path)
+        img = tk.PhotoImage(master=canvas, file=png_filename_path)
         application = Application(root, canvas, os.path.join(args.in_dir, in_filename),
                                   png_filename_path, out_filename_path, img, scale_factor)
         #application = Application(root, canvas, png_filename_path, tk.PhotoImage(file=png_filename_path))

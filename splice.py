@@ -49,13 +49,11 @@ class Splice():
         self.in_image_filename = in_image_filename
         self.out_image_filename = out_image_filename
         (self.image_width, self.image_height) = get_image_size(self.in_image_filename)
-        print('TWE splice size=', (self.image_width, self.image_height))
 
     def get_wh(self):
         return (self.image_width, self.image_height)
 
     def action(self, sides, left_size, top_size):
-        print('TWE splice sides=', sides, 'sizes=', (left_size, top_size))
         splice_arg = None
         side_code = ''.join([side[0].upper() for side in ['left', 'top', 'right', 'bottom'] if side in sides])
         if side_code == 'L':
@@ -79,7 +77,6 @@ class Splice():
                    '-background', 'black',
                    '-splice', splice_arg,
                    self.out_image_filename]
-            print('TWE', 'splice, cmd=%s' % ' '.join(cmd))
             ret = subprocess.call(cmd)
             if ret != 0:
                 raise Exception('Got a subprocess.call error %s, command=%s' % (ret,' '.join(cmd)))
