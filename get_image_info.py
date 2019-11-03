@@ -9,11 +9,11 @@ def get_image_size(fname):
     with open(fname, 'rb') as fhandle:
         head = fhandle.read(24)
         if len(head) != 24:
-            return
+            raise Exception('Bad header length %s, file=%s' % (len(head), fname))
         if imghdr.what(fname) == 'png':
             check = struct.unpack('>i', head[4:8])[0]
             if check != 0x0d0a1a0a:
-                return
+                raise Exception('Bad check %s, file=%s' % (check, fname))
             width, height = struct.unpack('>ii', head[16:24])
         elif imghdr.what(fname) == 'gif':
             width, height = struct.unpack('<HH', head[6:10])
@@ -33,7 +33,7 @@ def get_image_size(fname):
                 fhandle.seek(1, 1)  # Skip `precision' byte.
                 height, width = struct.unpack('>HH', fhandle.read(4))
             except Exception: #IGNORE:W0703
-                return
+                raise Exception('unknwn error, file=%s' % (fname,))
         else:
-            return
+            raise Exception('unknown file type %s, file=%s' % (imghdr.what(fname), fname))
         return width, height

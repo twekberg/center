@@ -114,7 +114,6 @@ def main(args):
             continue
         in_filename_path = os.path.join(args.in_dir, in_filename)
         # Put in clipboard in case a transform is needed or the image got an error.
-        add_to_clipboard(in_filename)
         root = tk.Tk()
         png_filename_path = os.path.join(args.tmp_dir, in_filename[0:-3] + 'png')
         (image_width, image_height) = get_image_size(in_filename_path)
@@ -130,6 +129,7 @@ def main(args):
         if image_height <= 1:
             print('-------------------------------------------------------------------------------')
             print('Bad image height. Use GIMP to re-export this image as a GIF.')
+            add_to_clipboard(in_filename)
             continue
         cmd = ['magick', 'convert', in_filename_path,
                '-resize', scale_factor+'%',
@@ -149,6 +149,7 @@ def main(args):
                                   png_filename_path, out_filename_path, img, scale_factor)
         #application = Application(root, canvas, png_filename_path, tk.PhotoImage(file=png_filename_path))
         tk.mainloop()
+        add_to_clipboard(in_filename)
         application.process_image()
         os.remove(png_filename_path)
         time.sleep(1)
