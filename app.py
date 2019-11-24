@@ -4,10 +4,11 @@
 Display an image file and report the mouse position on a mouse click.
 
 acen
-cd ~/STUFF/N/O/SPELLSNO/IMAGES/BIG  
+cd ~/STUFF/N/O/SPELLSNO/IMAGES/BIG
 ~/src/center/app.py -i 00SPREAD -o 00SPREAD-CENTER -t TMP
 """
 
+import glob
 import os
 import os.path
 import argparse
@@ -43,7 +44,6 @@ class Application():
         self.in_image_filename = in_image_filename
         self.out_image_filename = out_image_filename
         self.scale_factor = scale_factor
-        
         (self.image_width, self.image_height) = get_image_size(in_image_filename)
         (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
 
@@ -52,7 +52,7 @@ class Application():
         canvas.bind("<Button-3>", sys.exit)
 
 
-    def callback(self, event):  
+    def callback(self, event):
         # Need to /100 because the scale_factor is a percentage.
         self.x = round(event.x / (int(self.scale_factor)/100))
         self.y = round(event.y / (int(self.scale_factor)/100))
@@ -72,7 +72,6 @@ class Application():
                 sides.append(side)
         s = Splice(self.source_image_filename, self.out_image_filename)
         s.action(sides, left_side, top_side)
-        
 
 
 def compute_padding(x, y, width, height):
@@ -105,8 +104,10 @@ def add_to_clipboard(text):
 
 
 def main(args):
-    out_filenames = os.listdir(args.out_dir)
-    in_filenames  = os.listdir(args.in_dir)
+    out_filenames = [file for file in os.listdir(args.out_dir)
+                     if file[-3:] in ['gif', 'png', 'jpg']]
+    in_filenames  = [file for file in os.listdir(args.in_dir)
+                     if file[-3:] in ['gif', 'png', 'jpg']]
     n_file = 0
     for in_filename in in_filenames:
         n_file += 1
@@ -140,7 +141,7 @@ def main(args):
         (image_width, image_height) = get_image_size(png_filename_path)
 
         canvas = tk.Canvas(root, width =image_width, height = image_height)
-        canvas.pack()      
+        canvas.pack()
         # Putting the next line into __init__ causes the image to not appear.
 
         out_filename_path = os.path.join(args.out_dir, in_filename)
