@@ -3,6 +3,13 @@
 """
 Display an image file and report the mouse position on a mouse click.
 
+Calculate the image size with something like this:n
+
+ magick identify -format "%w x %h" -ping 00SPREAD/candy-0006.jpg
+750 x 489
+
+-ping just reads the header, not the whole file.
+
 acen
 cd ~/STUFF/N/O/SPELLSNO/IMAGES/BIG
 ~/src/center/app.py -i 00SPREAD -o 00SPREAD-CENTER -t TMP
@@ -56,7 +63,7 @@ class Application():
         # Need to /100 because the scale_factor is a percentage.
         self.x = round(event.x / (int(self.scale_factor)/100))
         self.y = round(event.y / (int(self.scale_factor)/100))
-        print('TWE In callback', self.scale_factor, (self.x, self.y),(event.x, event.y))
+        #print('TWE In callback', self.scale_factor, (self.x, self.y),(event.x, event.y))
         if self.x >= 0 and self.y >= 0:
             self.canvas.unbind("<Button-1>")
             self.root.destroy()

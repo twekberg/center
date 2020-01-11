@@ -1,7 +1,39 @@
+"""
+Get the size of an image.
+"""
+
+
+import argparse
 import struct
 import imghdr
+import subprocess
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description=__doc__.strip())
+
+    parser.add_argument('image_filename',
+                        help='Input image filename.')
+    return parser
+
 
 def get_image_size(fname):
+    """
+    magick has a way to determine the dimensions of an image.
+    it works for many image types.
+    returns: [width, height]
+
+    If an error is encountered, [0,0] is returned
+    """
+    cmd = ['magick', 'identify', '-format', '(%w,%h)', '-ping', fname]
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if process.returncode == 0:
+        return eval(process.stdout)
+    print(process.stderr.decode("utf-8"))
+    return [0,0]
+
+
+def get_image_size_old(fname):
     """
     Determine the image type of fname and return its size.
     On error returns None
@@ -37,3 +69,12 @@ def get_image_size(fname):
         else:
             raise Exception('unknown file type %s, file=%s' % (imghdr.what(fname), fname))
         return width, height
+
+
+def main(args):
+    (width, height) = get_image_size(args.image_filename)
+    print('width', width, ', height', height)
+
+
+if __name__ == '__main__':
+    main(build_parser().parse_args())
