@@ -111,8 +111,8 @@ def add_to_clipboard(text):
 
 
 def main(args):
-    out_filenames = [file for file in os.listdir(args.out_dir)
-                     if file[-3:] in ['gif', 'png', 'jpg']]
+    out_filenames = set([file for file in os.listdir(args.out_dir)
+                         if file[-3:] in ['gif', 'png', 'jpg']])
     in_filenames  = [file for file in os.listdir(args.in_dir)
                      if file[-3:] in ['gif', 'png', 'jpg']]
     n_file = 0
