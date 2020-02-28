@@ -66,9 +66,9 @@ def build_parser():
                         help='Alternate input directory for .lnk files. Default: %(default)s.')
 #                        default='00SPREAD',
 
-    parser.add_argument('-o', '--out_filename',
-                        default='spread-images.txt',
-                        help='Output filename for the filenames that were selected. '
+    parser.add_argument('-c', '--continue_filename',
+                        default='tests/spread-continue.txt',
+                        help='Filename that contains the last file processed. '
                         'Default: %(default)s.')
 
     parser.add_argument('-n', '--n_images', type=int,
@@ -76,26 +76,32 @@ def build_parser():
                         help='Number of images in a montage. '
                         'Default: %(default)s.')
 
+    parser.add_argument('-s', '--thumb_size', type=int,
+                        default=200,
+                        help='Width and height of each thumbnail. '
+                        'Default: %(default)s.')
+
+    parser.add_argument('-o', '--out_filename',
+                        default='spread-images.txt',
+                        help='Output filename for the filenames that were selected. '
+                        'Default: %(default)s.')
+
     parser.add_argument('-t', '--tmp_dir',
                         default='tests/tmp',
                         help='Temp directory. Default: %(default)s.')
 #                        default='TMP',
 
-    parser.add_argument('-c', '--continue_filename',
-                        default='spread-continue.txt',
-                        help='Filename that contains the last file processed. '
-                        'Default: %(default)s.')
     return parser
 
 
 class Application():
-    def __init__(self, root, canvas, source_image_filename, in_image_filename, img, scale_factor, out_filename, continue_filename):
+    def __init__(self, root, canvas, source_image_filename, in_image_filename, img, out_filename, continue_filename, thumb_size):
         self.root = root
         self.canvas = canvas
         self.source_image_filename = source_image_filename
         self.in_image_filename = in_image_filename
-        self.scale_factor = scale_factor
         self.out_filename = out_filename
+        self.thumb_size = thumb_size
         self.continue_filename = continue_filename
         (self.image_width, self.image_height) = get_image_size(in_image_filename)
         (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
@@ -108,32 +114,25 @@ class Application():
 
     def next(self, event):
         """
-        Skip to the next image.
+        Skip to the next montage.
         """
-        with open(self.continue_filename, 'w') as c:
-            c.write('%s\n' % (self.source_image_filename,))
-        x = round(event.x / (int(self.scale_factor)/100))
-        y = round(event.y / (int(self.scale_factor)/100))
-        if x >= 0 and y >= 0:
-            self.canvas.unbind("<Button-1>")
-            self.canvas.unbind("<Button-2>")
-            self.root.destroy()
+        self.canvas.unbind("<Button-1>")
+        self.canvas.unbind("<Button-2>")
+        self.root.destroy()
 
 
     def record(self, event):
         """
         Record the filename ansd skip to the next image.
         """
+        x = event.x
+        y = event.y
+        print(x,y)
+        return
         with open(self.continue_filename, 'w') as c:
             c.write('%s\n' % (self.source_image_filename,))
         with open(self.out_filename, 'a') as out_file:
             out_file.write('%s\n' % (self.source_image_filename,))
-        x = round(event.x / (int(self.scale_factor)/100))
-        y = round(event.y / (int(self.scale_factor)/100))
-        if x >= 0 and y >= 0:
-            self.canvas.unbind("<Button-1>")
-            self.canvas.unbind("<Button-2>")
-            self.root.destroy()
 
 
 def main(args):
@@ -176,27 +175,28 @@ def main(args):
         montage_filename_path = os.path.join(args.tmp_dir, 'montage.png')
         cmd = ['magick', 'montage', '-label', '%[width]x%[height]',
                '-size', '1000x1000', '-auto-orient',
-               '-geometry', '200x200+5+5', '-tile', '5x', '-frame', '5',
+               '-geometry',
+               '%sx%s+5+5' % (args.thumb_size, args.thumb_size),
+ '-tile', '5x', '-frame', '5',
                '-shadow']
         cmd += batch_filenames
         batch_filenames = []
         cmd.append(montage_filename_path)
-        for c in cmd:
-            print(c)
         ret = subprocess.call(cmd)
         if ret != 0:
             raise Exception('Got a subprocess.call error %s, command=%s' % (ret,' '.join(cmd)))
         (image_width, image_height) = get_image_size(montage_filename_path)
 
-        exit()
         canvas = tk.Canvas(root, width =image_width, height = image_height)
         canvas.pack()
-        # Putting the next line into __init__ causes the image to not appear.
 
+        # Putting the next line into __init__ causes the image to not appear.
         img = tk.PhotoImage(master=canvas, file=montage_filename_path)
+
         application = Application(root, canvas, os.path.join(args.in_dir, in_filename),
-                                  montage_filename_path, img, scale_factor, args.out_filename,
-                                  args.continue_filename)
+                                  montage_filename_path, img, args.out_filename,
+                                  args.continue_filename,
+                                  args.thumb_size)
         #application = Application(root, canvas, montage_filename_path, tk.PhotoImage(file=montage_filename_path))
         tk.mainloop()
         os.remove(montage_filename_path)
