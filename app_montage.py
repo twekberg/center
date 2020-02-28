@@ -11,7 +11,10 @@ Right - stop
 #
 r"""
 todo:
+Look at the spreadsheet for outlying points.
+
 Map mouse coordinates to an image file.
+
 This file can be written to out_filename.
 
 Add logic for the mouse callbacks as noted above.
