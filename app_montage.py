@@ -11,7 +11,7 @@ Right - stop
 #
 r"""
 todo:
-Look at the spreadsheet for outlying points.
+Write function that calculates the UL and LR corners.
 
 Map mouse coordinates to an image file.
 
@@ -24,6 +24,11 @@ of callbacks and put it into the main loop. It is the
 last file in a batch.
 
 done:
+Formulae for upper left and lower right coordinates
+Upper Left:  (11+220*n, 11+242*n)
+Lower Right: (212+220.3*n, 230+242*n)
+Look at the spreadsheet for outlying points.
+
 Displays args.n_images images in a montag.
 The images are all the same size so it looks like a grid.
 
