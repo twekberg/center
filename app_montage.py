@@ -11,9 +11,7 @@ Right - stop
 #
 r"""
 todo:
-Write function that calculates the UL and LR corners.
-
-Map mouse coordinates to an image file.
+Map image number determined by (x,y) point to the corresponding  image file.
 
 This file can be written to out_filename.
 
@@ -24,10 +22,13 @@ of callbacks and put it into the main loop. It is the
 last file in a batch.
 
 done:
+Wrote function that calculates the UL and LR corners.
+The left mouse click selects the right rectangle.
+
 Formulae for upper left and lower right coordinates
 Upper Left:  (11+220*n, 11+242*n)
 Lower Right: (212+220.3*n, 230+242*n)
-Look at the spreadsheet for outlying points.
+Displayed the image in gimp to determine the point positions
 
 Displays args.n_images images in a montag.
 The images are all the same size so it looks like a grid.
@@ -79,14 +80,20 @@ def build_parser():
                         help='Filename that contains the last file processed. '
                         'Default: %(default)s.')
 
+    parser.add_argument('-s', '--thumb_size', type=int,
+                        default=200,
+                        help='Width and height of each thumbnail. '
+                        'Default: %(default)s.')
+                        
     parser.add_argument('-n', '--n_images', type=int,
                         default=15,
                         help='Number of images in a montage. '
                         'Default: %(default)s.')
 
-    parser.add_argument('-s', '--thumb_size', type=int,
-                        default=200,
-                        help='Width and height of each thumbnail. '
+    
+    parser.add_argument('-r', '--row_size', type=int,
+                        default=5,
+                        help='Number of images per row. '
                         'Default: %(default)s.')
 
     parser.add_argument('-o', '--out_filename',
@@ -103,20 +110,25 @@ def build_parser():
 
 
 class Application():
-    def __init__(self, root, canvas, source_image_filename, in_image_filename, img, out_filename, continue_filename, thumb_size):
+    def __init__(self, args, root, canvas, source_image_filename, in_image_filename, img):
         self.root = root
         self.canvas = canvas
         self.source_image_filename = source_image_filename
         self.in_image_filename = in_image_filename
-        self.out_filename = out_filename
-        self.thumb_size = thumb_size
-        self.continue_filename = continue_filename
+        self.out_filename = args.out_filename
+        self.thumb_size = args.thumb_size
+        self.continue_filename = args.continue_filename
         (self.image_width, self.image_height) = get_image_size(in_image_filename)
         (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
-
+        self.rect_points = calc_points(args)
+        for rect in self.rect_points:
+            print(['i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s' %
+                   (rect['i'], rect['row'], rect['col'],
+                    rect['point_ul'], rect['point_lr'])
+                   for k in rect.keys()])
         canvas.create_image(0, 0, anchor=tk.NW, image=img)
-        canvas.bind("<Button-1>", self.next)
-        canvas.bind("<Button-2>", self.record)
+        canvas.bind("<Button-1>", self.select)
+        canvas.bind("<Button-2>", self.next)
         canvas.bind("<Button-3>", sys.exit)
 
 
@@ -129,18 +141,64 @@ class Application():
         self.root.destroy()
 
 
-    def record(self, event):
+    def select(self, event):
         """
-        Record the filename ansd skip to the next image.
+        Select an image and skip to the next montage.
         """
-        x = event.x
-        y = event.y
-        print(x,y)
+        point = Point(event.x, event.y)
+        print(point)
+        for rect in self.rect_points:
+            if point.within_rect(rect['point_ul'], rect['point_lr']):
+                print('found at', ['i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s' %
+                                   (rect['i'], rect['row'], rect['col'],
+                                    rect['point_ul'], rect['point_lr'])
+                                   for k in rect.keys()])
+                break
         return
         with open(self.continue_filename, 'w') as c:
             c.write('%s\n' % (self.source_image_filename,))
         with open(self.out_filename, 'a') as out_file:
             out_file.write('%s\n' % (self.source_image_filename,))
+
+
+class Point():
+    def __init__(self, x, y):
+        self.x = float(x)
+        self.y = float(y)
+
+    def __str__(self):
+        return "Point(%3.2f,%3.2f)" % (self.x, self.y) 
+
+    def within_rect(self, point_ul, point_lr):
+        """
+        Return True if this point is within a rectangle defined by
+        point_ul (upper left) and point_lr (lower right).
+        """
+        if self.x < point_ul.x or self.y < point_ul.y:
+            # To the left or above the rectangle
+            return False
+        if self.x > point_lr.x or self.y > point_lr.y:
+            # Below or to the right of the rectangle
+            return False
+        return True
+
+
+def calc_points(args):
+    """
+    Calculate the position of the upper left and lower right points
+    in each image.
+    """
+    points = []
+    for i in range(args.n_images):
+        row = int(i / args.row_size)
+        col = int(i % args.row_size)
+        point_ul = Point( 11 + 220 * col, 11  + 242 * row)
+        point_lr = Point(212 + 220 * col, 230 + 242 * row)
+        # Dropped the .3 from the LR X component because
+        # .3 * 5 = 1.5 pixels which is a small error.
+        points.append(dict(i=i, row=row, col=col,
+                           point_ul=point_ul, point_lr=point_lr))
+    return points
 
 
 def main(args):
@@ -185,7 +243,8 @@ def main(args):
                '-size', '1000x1000', '-auto-orient',
                '-geometry',
                '%sx%s+5+5' % (args.thumb_size, args.thumb_size),
- '-tile', '5x', '-frame', '5',
+               '-tile', '%sx' % (args.row_size,),
+               '-frame', '5',
                '-shadow']
         cmd += batch_filenames
         batch_filenames = []
@@ -201,10 +260,9 @@ def main(args):
         # Putting the next line into __init__ causes the image to not appear.
         img = tk.PhotoImage(master=canvas, file=montage_filename_path)
 
-        application = Application(root, canvas, os.path.join(args.in_dir, in_filename),
-                                  montage_filename_path, img, args.out_filename,
-                                  args.continue_filename,
-                                  args.thumb_size)
+        application = Application(args, root, canvas,
+                                  os.path.join(args.in_dir, in_filename),
+                                  montage_filename_path, img)
         #application = Application(root, canvas, montage_filename_path, tk.PhotoImage(file=montage_filename_path))
         tk.mainloop()
         os.remove(montage_filename_path)
