@@ -11,17 +11,19 @@ Right - stop
 #
 r"""
 todo:
-Map image number determined by (x,y) point to the corresponding  image file.
-
-This file can be written to out_filename.
-
-Add logic for the mouse callbacks as noted above.
-
 Change the logic for continue_filename. Move it out
 of callbacks and put it into the main loop. It is the
 last file in a batch.
 
+Do some more testing.
+
 done:
+The selected file can be written to out_filename.
+
+Mapped image number determined by (x,y) point to the corresponding  image file.
+
+Added logic for the mouse callbacks as noted above.
+
 Wrote function that calculates the UL and LR corners.
 The left mouse click selects the right rectangle.
 
@@ -110,7 +112,8 @@ def build_parser():
 
 
 class Application():
-    def __init__(self, args, root, canvas, source_image_filename, in_image_filename, img):
+    def __init__(self, args, root, canvas, source_image_filename, in_image_filename, img,
+                 rect_points):
         self.root = root
         self.canvas = canvas
         self.source_image_filename = source_image_filename
@@ -120,12 +123,13 @@ class Application():
         self.continue_filename = args.continue_filename
         (self.image_width, self.image_height) = get_image_size(in_image_filename)
         (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
-        self.rect_points = calc_points(args)
-        for rect in self.rect_points:
-            print(['i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s' %
-                   (rect['i'], rect['row'], rect['col'],
-                    rect['point_ul'], rect['point_lr'])
-                   for k in rect.keys()])
+        self.rect_points = rect_points
+        for p in self.rect_points:
+            print('i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s'
+                  ', filename=%s' %
+                  (p['i'], p['row'], p['col'],
+                   p['point_ul'], p['point_lr'],
+                   p['filename']))
         canvas.create_image(0, 0, anchor=tk.NW, image=img)
         canvas.bind("<Button-1>", self.select)
         canvas.bind("<Button-2>", self.next)
@@ -147,18 +151,19 @@ class Application():
         """
         point = Point(event.x, event.y)
         print(point)
-        for rect in self.rect_points:
-            if point.within_rect(rect['point_ul'], rect['point_lr']):
-                print('found at', ['i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s' %
-                                   (rect['i'], rect['row'], rect['col'],
-                                    rect['point_ul'], rect['point_lr'])
-                                   for k in rect.keys()])
+        for p in self.rect_points:
+            if point.within_rect(p['point_ul'], p['point_lr']):
+                print('found at', 'i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s'
+                      ', filename=%s' %
+                      (p['i'], p['row'], p['col'],
+                       p['point_ul'], p['point_lr'],
+                       p['filename']))
                 break
         return
         with open(self.continue_filename, 'w') as c:
-            c.write('%s\n' % (self.source_image_filename,))
+            c.write('%s\n' % (point['filename'],))
         with open(self.out_filename, 'a') as out_file:
-            out_file.write('%s\n' % (self.source_image_filename,))
+            out_file.write('%s\n' % (point['filename'],))
 
 
 class Point():
@@ -183,7 +188,7 @@ class Point():
         return True
 
 
-def calc_points(args):
+def calc_rect_points(args):
     """
     Calculate the position of the upper left and lower right points
     in each image.
@@ -221,10 +226,11 @@ def main(args):
             part = 2
         in_filename_path = os.path.join(args.in_dir, in_filename)
         if in_filename_path.endswith('.lnk'):
+            # Get the base name of the file with its image extension.
             in_ext = ' - Shortcut.lnk'
             if in_filename.endswith(in_ext):
                 in_filename = in_filename[:-len(in_ext)]
-            # The .lnk files came from this directory
+            # The files being linked to are in this directory.
             in_filename_path = os.path.join(args.alt_in_dir, in_filename)
             for ext in ['gif', 'png', 'jpg']:
                 in_filename_path = in_filename_path[:-3] + ext
@@ -247,7 +253,6 @@ def main(args):
                '-frame', '5',
                '-shadow']
         cmd += batch_filenames
-        batch_filenames = []
         cmd.append(montage_filename_path)
         ret = subprocess.call(cmd)
         if ret != 0:
@@ -257,13 +262,18 @@ def main(args):
         canvas = tk.Canvas(root, width =image_width, height = image_height)
         canvas.pack()
 
+        rect_points = calc_rect_points(args)
+        for p in rect_points:
+            p['filename'] = batch_filenames[p['i']]
+
         # Putting the next line into __init__ causes the image to not appear.
         img = tk.PhotoImage(master=canvas, file=montage_filename_path)
-
         application = Application(args, root, canvas,
                                   os.path.join(args.in_dir, in_filename),
-                                  montage_filename_path, img)
+                                  montage_filename_path, img,
+                                  rect_points)
         #application = Application(root, canvas, montage_filename_path, tk.PhotoImage(file=montage_filename_path))
+        batch_filenames = []
         tk.mainloop()
         os.remove(montage_filename_path)
 
