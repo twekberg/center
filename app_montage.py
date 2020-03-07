@@ -11,13 +11,14 @@ Right - stop
 #
 r"""
 todo:
-Change the logic for continue_filename. Move it out
-of callbacks and put it into the main loop. It is the
-last file in a batch.
-
-Do some more testing.
 
 done:
+Did some more testing. Looks good.
+
+Decided not to change the logic for continue_filename. Move it out of
+callbacks and put it into the main loop. It is the last file in a
+batch.
+
 The selected file can be written to out_filename.
 
 Mapped image number determined by (x,y) point to the corresponding  image file.
@@ -87,9 +88,9 @@ def build_parser():
                         help='Width and height of each thumbnail. '
                         'Default: %(default)s.')
                         
-    parser.add_argument('-n', '--n_images', type=int,
-                        default=15,
-                        help='Number of images in a montage. '
+    parser.add_argument('-n', '--n_rows', type=int,
+                        default=3,
+                        help='Number of thumbnail rows in a montage. '
                         'Default: %(default)s.')
 
     
@@ -99,7 +100,7 @@ def build_parser():
                         'Default: %(default)s.')
 
     parser.add_argument('-o', '--out_filename',
-                        default='spread-images.txt',
+                        default='tests/spread-images.txt',
                         help='Output filename for the filenames that were selected. '
                         'Default: %(default)s.')
 
@@ -124,16 +125,12 @@ class Application():
         (self.image_width, self.image_height) = get_image_size(in_image_filename)
         (self.source_image_width, self.source_image_height) = get_image_size(source_image_filename)
         self.rect_points = rect_points
-        for p in self.rect_points:
-            print('i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s'
-                  ', filename=%s' %
-                  (p['i'], p['row'], p['col'],
-                   p['point_ul'], p['point_lr'],
-                   p['filename']))
         canvas.create_image(0, 0, anchor=tk.NW, image=img)
         canvas.bind("<Button-1>", self.select)
         canvas.bind("<Button-2>", self.next)
         canvas.bind("<Button-3>", sys.exit)
+        # Used to determine continue filename and dedup.
+        self.selected_filenames = []
 
 
     def next(self, event):
@@ -149,21 +146,37 @@ class Application():
         """
         Select an image and skip to the next montage.
         """
+        # Locate the image that matches this point.
         point = Point(event.x, event.y)
-        print(point)
         for p in self.rect_points:
             if point.within_rect(p['point_ul'], p['point_lr']):
-                print('found at', 'i=%s, row=%s, col=%s, point_ul=%s, point_ur=%s'
-                      ', filename=%s' %
-                      (p['i'], p['row'], p['col'],
-                       p['point_ul'], p['point_lr'],
-                       p['filename']))
+                selected_filename = p['filename']
+                print('%s' % (selected_filename,))
                 break
-        return
-        with open(self.continue_filename, 'w') as c:
-            c.write('%s\n' % (point['filename'],))
-        with open(self.out_filename, 'a') as out_file:
-            out_file.write('%s\n' % (point['filename'],))
+        else:
+            # Outside all images.
+            return
+        new_filename = False
+        if len(self.selected_filenames) > 0:
+            bigger_file = selected_filename > self.selected_filenames[-1]
+        else:
+            bigger_file = True
+        if selected_filename not in self.selected_filenames:
+            self.selected_filenames.append(selected_filename)
+            self.selected_filenames.sort()
+            new_filename = True
+            print('Adding %s' % (selected_filename,))
+        # EIther first file or a filename that is after the current max.
+        if bigger_file:
+            # Have a new file to continue with.
+            with open(self.continue_filename, 'w') as c:
+                c.write('%s\n' % (selected_filename,))
+            print('Wrote %s to %s' % (selected_filename, self.continue_filename))
+        if new_filename:
+            # dedup
+            with open(self.out_filename, 'a') as out_file:
+                out_file.write('%s\n' % (selected_filename,))
+            print('Wrote %s to %s' % (selected_filename, self.out_filename))
 
 
 class Point():
@@ -194,7 +207,7 @@ def calc_rect_points(args):
     in each image.
     """
     points = []
-    for i in range(args.n_images):
+    for i in range(args.n_rows * args.row_size):
         row = int(i / args.row_size)
         col = int(i % args.row_size)
         point_ul = Point( 11 + 220 * col, 11  + 242 * row)
@@ -210,19 +223,24 @@ def main(args):
     in_filenames  = [file for file in os.listdir(args.in_dir)
                      if file[-3:] in ['gif', 'png', 'jpg', 'lnk']]
     n_file = 0
-    part = 1                    # Section of files to skiip over
+    n_images = args.n_rows * args.row_size
+    part = 1                    # Section of files to skip over
     try:
         with open(args.continue_filename) as c:
             start_filename = c.readline().strip().split('/')[1]
     except FileNotFoundError:
         start_filename = ''
-        print('Skipping to %s' % (start_filename,))
+        print('Skipping to just after %s' % (start_filename,))
     batch_filenames = []
     for in_filename in in_filenames:
         n_file += 1
         if start_filename and part == 1 and not in_filename.startswith(start_filename):
             continue
         else:
+            if part == 1:
+                # Skip just after this filename
+                part = 2
+                continue
             part = 2
         in_filename_path = os.path.join(args.in_dir, in_filename)
         if in_filename_path.endswith('.lnk'):
@@ -240,12 +258,12 @@ def main(args):
                 print('Unable to find this file: %s' % in_filename_path)
                 exit(1)
         batch_filenames.append(in_filename_path)
-        if len(batch_filenames) < args.n_images:
+        if len(batch_filenames) < n_images:
             continue
         
         root = tk.Tk()
         montage_filename_path = os.path.join(args.tmp_dir, 'montage.png')
-        cmd = ['magick', 'montage', '-label', '%[width]x%[height]',
+        cmd = ['magick', 'montage', '-label', '%[basename]\n%[width]x%[height]',
                '-size', '1000x1000', '-auto-orient',
                '-geometry',
                '%sx%s+5+5' % (args.thumb_size, args.thumb_size),
