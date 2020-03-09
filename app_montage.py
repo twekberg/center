@@ -10,7 +10,11 @@ Right - stop
 """
 #
 r"""
+To get ls to sort properly, one must do this:
+LC_COLLATE=C ls in/
 todo:
+
+Redo the default directories to more closely match the eventual directories.
 
 done:
 Did some more testing. Looks good.
@@ -131,12 +135,19 @@ class Application():
         canvas.bind("<Button-3>", sys.exit)
         # Used to determine continue filename and dedup.
         self.selected_filenames = []
+        (_, last_p) = max([(p['i'], p) for p in rect_points])
+        self.last_montage_filename = last_p['filename']
 
 
     def next(self, event):
         """
         Skip to the next montage.
         """
+        # Note the last image on this montage that we have already seen.
+        with open(self.continue_filename, 'w') as c:
+            c.write('%s\n' % (self.last_montage_filename,))
+            print('Wrote %s to %s' % (self.last_montage_filename,
+                                      self.continue_filename))
         self.canvas.unbind("<Button-1>")
         self.canvas.unbind("<Button-2>")
         self.root.destroy()
@@ -166,12 +177,7 @@ class Application():
             self.selected_filenames.sort()
             new_filename = True
             print('Adding %s' % (selected_filename,))
-        # EIther first file or a filename that is after the current max.
-        if bigger_file:
-            # Have a new file to continue with.
-            with open(self.continue_filename, 'w') as c:
-                c.write('%s\n' % (selected_filename,))
-            print('Wrote %s to %s' % (selected_filename, self.continue_filename))
+        # Either first file or a filename that is after the current max.
         if new_filename:
             # dedup
             with open(self.out_filename, 'a') as out_file:
@@ -227,13 +233,14 @@ def main(args):
     part = 1                    # Section of files to skip over
     try:
         with open(args.continue_filename) as c:
-            start_filename = c.readline().strip().split('/')[1]
+            start_filename = c.readline().strip().split('/')[-1]
     except FileNotFoundError:
         start_filename = ''
         print('Skipping to just after %s' % (start_filename,))
     batch_filenames = []
     for in_filename in in_filenames:
         n_file += 1
+        print('%d %s  %s' % (part, start_filename, in_filename))
         if start_filename and part == 1 and not in_filename.startswith(start_filename):
             continue
         else:
