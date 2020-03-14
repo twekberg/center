@@ -14,9 +14,9 @@ To get ls to sort properly, one must do this:
 LC_COLLATE=C ls in/
 todo:
 
-Redo the default directories to more closely match the eventual directories.
-
 done:
+Reworked the default directories to more closely match the eventual directories.
+
 Did some more testing. Looks good.
 
 Decided not to change the logic for continue_filename. Move it out of
@@ -73,17 +73,15 @@ def build_parser():
     parser = argparse.ArgumentParser(description=__doc__.strip())
 
     parser.add_argument('-i', '--in_dir',
-                        default='tests/in',
+                        default='00SPREAD',
                         help='Input directory. Default: %(default)s.')
-#                        default='00CRAB',
 
     parser.add_argument('-a', '--alt_in_dir',
-                        default='tests/alt_in',
+                        default='alt_in',
                         help='Alternate input directory for .lnk files. Default: %(default)s.')
-#                        default='00SPREAD',
 
     parser.add_argument('-c', '--continue_filename',
-                        default='tests/spread-continue.txt',
+                        default='spread-continue.txt',
                         help='Filename that contains the last file processed. '
                         'Default: %(default)s.')
 
@@ -104,15 +102,13 @@ def build_parser():
                         'Default: %(default)s.')
 
     parser.add_argument('-o', '--out_filename',
-                        default='tests/spread-images.txt',
+                        default='spread-images.txt',
                         help='Output filename for the filenames that were selected. '
                         'Default: %(default)s.')
 
     parser.add_argument('-t', '--tmp_dir',
-                        default='tests/tmp',
+                        default='TMP',
                         help='Temp directory. Default: %(default)s.')
-#                        default='TMP',
-
     return parser
 
 
